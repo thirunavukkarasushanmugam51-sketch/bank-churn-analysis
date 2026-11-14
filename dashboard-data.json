@@ -1,29 +1,29 @@
 {
   "total": 10000,
-  "averageBalance": 76485.89,
-  "averageCreditScore": 650.5,
-  "averageAge": 38.9,
+  "averageBalance": 76485.889288,
+  "averageCreditScore": 650.5288,
+  "averageAge": 38.9218,
   "geographies": [
     {
       "name": "France",
       "count": 5014,
-      "averageCreditScore": 649.7,
-      "averageBalance": 62092.64,
-      "averageAge": 38.5
+      "averageCreditScore": 649.6683286796969,
+      "averageBalance": 62092.63651575588,
+      "averageAge": 38.51176705225369
     },
     {
       "name": "Germany",
       "count": 2509,
-      "averageCreditScore": 651.5,
-      "averageBalance": 119730.12,
-      "averageAge": 39.8
+      "averageCreditScore": 651.4535671582304,
+      "averageBalance": 119730.1161339179,
+      "averageAge": 39.771622160223195
     },
     {
       "name": "Spain",
       "count": 2477,
-      "averageCreditScore": 651.3,
-      "averageBalance": 61818.15,
-      "averageAge": 38.9
+      "averageCreditScore": 651.3338716188938,
+      "averageBalance": 61818.14776342349,
+      "averageAge": 38.89099717400081
     }
   ],
   "ageBins": [
