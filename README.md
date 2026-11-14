@@ -2,10 +2,13 @@
 
 A Python project for exploring bank customer data through summary statistics, geography counts, distributions, correlations, and churn breakdowns.
 
+![Bank customers by geography](geography_customers.png)
+
 ## Project files
 
 - `bank_analaysis.py` — main analysis script.
 - `churn-selected-columns.csv` — dataset read by the script.
+- `geography_customers.png` — customer count chart by geography.
 
 ## Requirements
 
