@@ -1,140 +1,32 @@
 (() => {
   "use strict";
 
+  const PAGE_SIZE = 25;
   const colors = ["#7669eb", "#20b6a5", "#48a9e8", "#efa85d", "#ec7d91", "#7589db"];
   const elements = {
     fileInput: document.querySelector("#file-input"),
     uploadButton: document.querySelector("#upload-button"),
+    uploadFeedback: document.querySelector("#upload-feedback"),
+    fileProgress: document.querySelector("#file-progress"),
     notice: document.querySelector("#notice"),
     regionRows: document.querySelector("#region-rows"),
     regionCount: document.querySelector("#region-count"),
+    uploadedRecords: document.querySelector("#uploaded-records"),
+    recordSearch: document.querySelector("#record-search"),
+    recordRows: document.querySelector("#record-rows"),
+    recordEmpty: document.querySelector("#record-empty"),
+    recordCount: document.querySelector("#record-count"),
+    pageLabel: document.querySelector("#page-label"),
+    previousPage: document.querySelector("#previous-page"),
+    nextPage: document.querySelector("#next-page"),
   };
   const numberFormat = new Intl.NumberFormat("en-US");
   const moneyFormat = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   let sourceName = "churn-selected-columns.csv";
-
-  function safeNumber(value) {
-    if (value === undefined || value.trim() === "") return null;
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-  }
-
-  function parseCsv(text) {
-    const rows = [];
-    let row = [];
-    let field = "";
-    let quoted = false;
-    for (let index = 0; index < text.length; index += 1) {
-      const character = text[index];
-      if (quoted) {
-        if (character === '"' && text[index + 1] === '"') {
-          field += '"';
-          index += 1;
-        } else if (character === '"') {
-          quoted = false;
-        } else {
-          field += character;
-        }
-      } else if (character === '"' && field.length === 0) {
-        quoted = true;
-      } else if (character === ",") {
-        row.push(field);
-        field = "";
-      } else if (character === "\n") {
-        row.push(field.replace(/\r$/, ""));
-        if (row.some((cell) => cell.trim() !== "")) rows.push(row);
-        row = [];
-        field = "";
-      } else {
-        field += character;
-      }
-    }
-    if (quoted) throw new Error("The CSV contains an unclosed quoted field.");
-    if (field.length > 0 || row.length > 0) {
-      row.push(field.replace(/\r$/, ""));
-      if (row.some((cell) => cell.trim() !== "")) rows.push(row);
-    }
-    if (rows.length < 2) throw new Error("The CSV does not contain any customer records.");
-
-    const headers = rows[0].map((header) => header.trim().replace(/^\uFEFF/, ""));
-    const required = ["CreditScore", "Age", "Balance", "NumOfProducts", "Geography"];
-    const missing = required.filter((column) => !headers.includes(column));
-    if (missing.length) throw new Error(`Missing required columns: ${missing.join(", ")}.`);
-    const indexes = Object.fromEntries(headers.map((header, index) => [header, index]));
-
-    return rows.slice(1).map((cells) => {
-      const creditScore = safeNumber(cells[indexes.CreditScore] || "");
-      const age = safeNumber(cells[indexes.Age] || "");
-      const balance = safeNumber(cells[indexes.Balance] || "");
-      const products = safeNumber(cells[indexes.NumOfProducts] || "");
-      const exited = indexes.Exited === undefined ? null : safeNumber(cells[indexes.Exited] || "");
-      if ([creditScore, age, balance, products].some((value) => value === null)) return null;
-      return {
-        creditScore,
-        age,
-        balance,
-        products,
-        geography: (cells[indexes.Geography] || "").trim() || "Unknown",
-        exited,
-      };
-    }).filter(Boolean);
-  }
-
-  function average(records, field) {
-    return records.reduce((sum, record) => sum + record[field], 0) / records.length;
-  }
-
-  function makeBins(records, field, minimum, maximum, count = 18) {
-    const bins = Array.from({ length: count }, () => 0);
-    records.forEach((record) => {
-      const position = Math.min(0.999999, Math.max(0, (record[field] - minimum) / (maximum - minimum)));
-      bins[Math.floor(position * count)] += 1;
-    });
-    return bins;
-  }
-
-  function summarize(records) {
-    if (!records.length) throw new Error("No valid customer records were found in this CSV.");
-    const groups = new Map();
-    const productCounts = new Map();
-    records.forEach((record) => {
-      if (!groups.has(record.geography)) groups.set(record.geography, []);
-      groups.get(record.geography).push(record);
-      productCounts.set(record.products, (productCounts.get(record.products) || 0) + 1);
-    });
-    const geographies = [...groups.entries()].map(([name, group]) => ({
-      name,
-      count: group.length,
-      averageCreditScore: average(group, "creditScore"),
-      averageBalance: average(group, "balance"),
-      averageAge: average(group, "age"),
-    })).sort((first, second) => second.count - first.count || first.name.localeCompare(second.name));
-    const churnRecords = records.filter((record) => record.exited === 0 || record.exited === 1);
-    const churn = churnRecords.length
-      ? { total: churnRecords.length, exited: churnRecords.filter((record) => record.exited === 1).length }
-      : null;
-
-    return {
-      total: records.length,
-      averageBalance: average(records, "balance"),
-      averageCreditScore: average(records, "creditScore"),
-      averageAge: average(records, "age"),
-      geographies,
-      ageBins: makeBins(records, "age", 18, 93),
-      balanceBins: makeBins(records, "balance", 0, 250000),
-      products: [...productCounts.entries()].sort((first, second) => first[0] - second[0])
-        .map(([name, count]) => ({ name, count })),
-      churn,
-    };
-  }
-
-  function validateSummary(summary) {
-    if (!summary || !Number.isFinite(summary.total) || summary.total < 1
-      || !Array.isArray(summary.geographies) || !Array.isArray(summary.ageBins)
-      || !Array.isArray(summary.balanceBins) || !Array.isArray(summary.products)) {
-      throw new Error("The dashboard summary file has an invalid format.");
-    }
-  }
+  let csvWorker = null;
+  let activeRequest = 0;
+  let currentPage = 1;
+  let searchTimer = null;
 
   function showNotice(message, isError = false) {
     elements.notice.textContent = message;
@@ -145,14 +37,13 @@
   function renderRegions(summary) {
     const rows = summary.geographies.map((region) => {
       const row = document.createElement("tr");
-      const values = [
+      [
         region.name,
         numberFormat.format(region.count),
         `${((region.count / summary.total) * 100).toFixed(1)}%`,
         region.averageCreditScore.toFixed(1),
         moneyFormat.format(region.averageBalance),
-      ];
-      values.forEach((value) => {
+      ].forEach((value) => {
         const cell = document.createElement("td");
         cell.textContent = value;
         row.append(cell);
@@ -203,7 +94,12 @@
   }
 
   function renderDashboard(summary) {
-    validateSummary(summary);
+    if (!summary || !Number.isFinite(summary.total) || summary.total < 1
+      || !Array.isArray(summary.geographies) || !Array.isArray(summary.ageBins)
+      || !Array.isArray(summary.balanceBins) || !Array.isArray(summary.products)) {
+      throw new Error("The dashboard summary file has an invalid format.");
+    }
+
     document.querySelector("#total-customers").textContent = numberFormat.format(summary.total);
     document.querySelector("#average-balance").textContent = moneyFormat.format(summary.averageBalance);
     document.querySelector("#average-score").textContent = Math.round(summary.averageCreditScore).toString();
@@ -224,6 +120,137 @@
     }
   }
 
+  function requestRecordPage(page = currentPage) {
+    if (!csvWorker) return;
+    currentPage = page;
+    activeRequest += 1;
+    csvWorker.postMessage({
+      type: "page",
+      requestId: activeRequest,
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      search: elements.recordSearch.value.trim(),
+    });
+  }
+
+  function renderRecordPage(result) {
+    const start = (result.page - 1) * PAGE_SIZE;
+    elements.recordRows.replaceChildren(...result.records.map((record, index) => {
+      const row = document.createElement("tr");
+      const customerCell = document.createElement("td");
+      const customer = document.createElement("div");
+      customer.className = "customer-cell";
+      const avatar = document.createElement("span");
+      avatar.className = "customer-avatar";
+      avatar.textContent = (record.surname || "R").slice(0, 1);
+      const name = document.createElement("span");
+      name.append(document.createTextNode(record.surname || "Customer"));
+      const id = document.createElement("span");
+      id.className = "customer-id";
+      id.textContent = record.customerId ? `ID ${record.customerId}` : `Record ${numberFormat.format(start + index + 1)}`;
+      name.append(id);
+      customer.append(avatar, name);
+      customerCell.append(customer);
+
+      const values = [
+        record.geography,
+        numberFormat.format(record.creditScore),
+        `${numberFormat.format(record.age)} yrs`,
+        moneyFormat.format(record.balance),
+        Number.isFinite(record.products) ? record.products.toString() : "—",
+      ];
+      row.append(customerCell);
+      values.forEach((value) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.append(cell);
+      });
+      return row;
+    }));
+    elements.recordEmpty.hidden = result.total > 0;
+    elements.recordCount.textContent = result.total
+      ? `Showing ${numberFormat.format(start + 1)}–${numberFormat.format(Math.min(start + result.records.length, result.total))} of ${numberFormat.format(result.total)} matching records`
+      : "Showing 0 matching records";
+    elements.pageLabel.textContent = `${result.page} / ${result.pageCount}`;
+    elements.previousPage.disabled = result.page <= 1;
+    elements.nextPage.disabled = result.page >= result.pageCount;
+  }
+
+  function handleWorkerMessage(event) {
+    const message = event.data;
+    if (message.type === "progress") {
+      const percent = message.totalBytes ? Math.floor((message.loadedBytes / message.totalBytes) * 100) : 0;
+      elements.fileProgress.value = percent;
+      elements.uploadFeedback.textContent = `Reading ${sourceName}: ${percent}% · ${numberFormat.format(message.validRecords)} valid records found`;
+      return;
+    }
+    if (message.type === "error") {
+      elements.fileProgress.hidden = true;
+      elements.uploadButton.disabled = false;
+      elements.fileInput.disabled = false;
+      elements.uploadFeedback.classList.add("error");
+      elements.uploadFeedback.textContent = `Could not read the CSV: ${message.message}`;
+      return;
+    }
+    if (message.type === "complete") {
+      try {
+        renderDashboard(message.summary);
+      } catch (error) {
+        elements.uploadFeedback.classList.add("error");
+        elements.uploadFeedback.textContent = error.message;
+        elements.fileProgress.hidden = true;
+        elements.uploadButton.disabled = false;
+        elements.fileInput.disabled = false;
+        return;
+      }
+      elements.uploadedRecords.hidden = false;
+      elements.uploadFeedback.classList.remove("error");
+      elements.uploadFeedback.textContent = `${sourceName} is ready · ${numberFormat.format(message.summary.total)} records loaded. Search below to view the uploaded rows.`;
+      elements.fileProgress.value = 100;
+      elements.fileProgress.hidden = true;
+      elements.uploadButton.disabled = false;
+      elements.fileInput.disabled = false;
+      elements.recordSearch.value = "";
+      requestRecordPage(1);
+      elements.uploadedRecords.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (message.type === "page" && message.requestId === activeRequest) {
+      renderRecordPage(message);
+    }
+  }
+
+  function beginUpload(file) {
+    if (csvWorker) csvWorker.terminate();
+    try {
+      csvWorker = new Worker("./csv-worker.js");
+    } catch (error) {
+      elements.uploadFeedback.classList.add("error");
+      elements.uploadFeedback.textContent = `Could not start the CSV reader: ${error.message}`;
+      return;
+    }
+    csvWorker.addEventListener("message", handleWorkerMessage);
+    csvWorker.addEventListener("error", (event) => {
+      elements.fileProgress.hidden = true;
+      elements.uploadButton.disabled = false;
+      elements.fileInput.disabled = false;
+      elements.uploadFeedback.classList.add("error");
+      elements.uploadFeedback.textContent = `CSV processing stopped: ${event.message || "Unknown worker error."}`;
+    }, { once: true });
+
+    sourceName = file.name;
+    currentPage = 1;
+    elements.uploadButton.disabled = true;
+    elements.fileInput.disabled = true;
+    elements.fileProgress.hidden = false;
+    elements.fileProgress.value = 0;
+    elements.uploadFeedback.classList.remove("error");
+    elements.uploadFeedback.textContent = `Preparing ${file.name}…`;
+    elements.uploadedRecords.hidden = true;
+    showNotice("");
+    csvWorker.postMessage({ type: "parse", file });
+  }
+
   async function loadDefaultDataset() {
     try {
       const response = await fetch("./dashboard-data.json");
@@ -231,6 +258,7 @@
       const summary = await response.json();
       sourceName = "churn-selected-columns.csv (aggregated)";
       renderDashboard(summary);
+      elements.uploadFeedback.textContent = "Choose a CSV to view its records. Files you select stay in this browser.";
     } catch (error) {
       showNotice(`${error.message} Start a local web server to open this dashboard.`, true);
       document.querySelector("#updated-label").textContent = "Summary not loaded";
@@ -238,19 +266,17 @@
   }
 
   elements.uploadButton.addEventListener("click", () => elements.fileInput.click());
-  elements.fileInput.addEventListener("change", async (event) => {
+  elements.fileInput.addEventListener("change", (event) => {
     const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    try {
-      const records = parseCsv(await file.text());
-      sourceName = `${file.name} (aggregated locally)`;
-      renderDashboard(summarize(records));
-    } catch (error) {
-      showNotice(error.message, true);
-    } finally {
-      event.target.value = "";
-    }
+    if (file) beginUpload(file);
+    event.target.value = "";
   });
+  elements.recordSearch.addEventListener("input", () => {
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => requestRecordPage(1), 180);
+  });
+  elements.previousPage.addEventListener("click", () => requestRecordPage(currentPage - 1));
+  elements.nextPage.addEventListener("click", () => requestRecordPage(currentPage + 1));
 
   loadDefaultDataset();
 })();

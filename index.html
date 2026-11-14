@@ -50,6 +50,11 @@
           </div>
         </header>
 
+        <div class="upload-feedback" id="upload-feedback" role="status" aria-live="polite">
+          Select a CSV to see its bank customer records. Uploaded files stay in this browser.
+        </div>
+        <progress class="upload-progress" id="file-progress" max="100" value="0" aria-label="CSV upload progress" hidden></progress>
+
         <section class="page-heading">
           <div>
             <p class="eyebrow">CUSTOMER INTELLIGENCE</p>
@@ -124,7 +129,7 @@
 
         <section class="panel customers-panel" id="regions">
           <div class="panel-heading customer-heading">
-            <div><h2>Regional summary</h2><p>Aggregated statistics only; individual customer records are not shown.</p></div>
+            <div><h2>Regional summary</h2><p>Aggregated statistics from the selected customer data.</p></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -133,6 +138,28 @@
             </table>
           </div>
           <div class="table-footer"><span id="region-count">—</span><span>Country-level averages</span></div>
+        </section>
+
+        <section class="panel customers-panel uploaded-records" id="uploaded-records" hidden>
+          <div class="panel-heading customer-heading">
+            <div><h2>Uploaded customer records</h2><p>Private preview of the CSV you selected. Records are not sent to the website.</p></div>
+            <label class="search-box"><span aria-hidden="true">⌕</span><input id="record-search" type="search" placeholder="Search name or ID" aria-label="Search uploaded records"></label>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Customer</th><th>Geography</th><th>Credit score</th><th>Age</th><th>Balance</th><th>Products</th></tr></thead>
+              <tbody id="record-rows"></tbody>
+            </table>
+            <div id="record-empty" class="empty-state" hidden>No records match your search.</div>
+          </div>
+          <div class="table-footer">
+            <span id="record-count">Showing 0 records</span>
+            <div class="pagination">
+              <button id="previous-page" type="button" aria-label="Previous page" disabled>‹</button>
+              <span id="page-label">1 / 1</span>
+              <button id="next-page" type="button" aria-label="Next page" disabled>›</button>
+            </div>
+          </div>
         </section>
 
         <footer class="page-footer"><span>Northstar Analytics</span><span id="data-source">Source: churn-selected-columns.csv</span></footer>
