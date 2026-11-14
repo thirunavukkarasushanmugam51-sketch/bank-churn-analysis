@@ -149,7 +149,7 @@
         region.name,
         numberFormat.format(region.count),
         `${((region.count / summary.total) * 100).toFixed(1)}%`,
-        numberFormat.format(Math.round(region.averageCreditScore)),
+        region.averageCreditScore.toFixed(1),
         moneyFormat.format(region.averageBalance),
       ];
       values.forEach((value) => {
