@@ -1,0 +1,88 @@
+{
+  "total": 10000,
+  "averageBalance": 76485.89,
+  "averageCreditScore": 650.5,
+  "averageAge": 38.9,
+  "geographies": [
+    {
+      "name": "France",
+      "count": 5014,
+      "averageCreditScore": 649.7,
+      "averageBalance": 62092.64,
+      "averageAge": 38.5
+    },
+    {
+      "name": "Germany",
+      "count": 2509,
+      "averageCreditScore": 651.5,
+      "averageBalance": 119730.12,
+      "averageAge": 39.8
+    },
+    {
+      "name": "Spain",
+      "count": 2477,
+      "averageCreditScore": 651.3,
+      "averageBalance": 61818.15,
+      "averageAge": 38.9
+    }
+  ],
+  "ageBins": [
+    226,
+    585,
+    1157,
+    1711,
+    1885,
+    1542,
+    1184,
+    568,
+    342,
+    274,
+    207,
+    127,
+    107,
+    51,
+    22,
+    8,
+    2,
+    2
+  ],
+  "balanceBins": [
+    3619,
+    7,
+    29,
+    68,
+    196,
+    418,
+    664,
+    1077,
+    1191,
+    1103,
+    794,
+    435,
+    248,
+    104,
+    32,
+    12,
+    1,
+    2
+  ],
+  "products": [
+    {
+      "name": 1,
+      "count": 5084
+    },
+    {
+      "name": 2,
+      "count": 4590
+    },
+    {
+      "name": 3,
+      "count": 266
+    },
+    {
+      "name": 4,
+      "count": 60
+    }
+  ],
+  "churn": null
+}
